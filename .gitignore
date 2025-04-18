@@ -1,0 +1,26 @@
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+*.egg-info/
+
+# Jupyter
+.ipynb_checkpoints/
+
+# VS Code or IDEs
+.vscode/
+.idea/
+
+# OS
+.DS_Store
+
+# Conda/venv
+.env/
+.venv/
+*.env
+*.conda
+*.log
+
+# 結果だけ残したいなら、以下を追加
+# output.log
