@@ -30,7 +30,7 @@ class PolicyGCNLSTM(nn.Module):
     def encode(self, x, edge_index, edge_weight):
         ''' グラフの特徴量をエンコードする '''
         x = self.conv1(x, edge_index, edge_weight)
-        # x = self.relu(x)
+        x = self.relu(x)
         # x = self.conv2(x, edge_index, edge_weight)
         # x = self.relu(x)
         return x
