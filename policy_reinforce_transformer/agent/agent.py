@@ -3,8 +3,8 @@ import os
 # プロジェクトのルートディレクトリを追加
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 from itertools import combinations
-from model.model_mha import Encoder
-from model.model_mha import Decoder
+from model.model_transformer import Encoder
+from model.model_transformer import Decoder
 import torch
 from torch import optim
 from utils import get_device

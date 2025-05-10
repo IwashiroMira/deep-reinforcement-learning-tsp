@@ -12,22 +12,52 @@ import numpy as np
 
 
 # Multi-Head Attentionを用いたTSPのモデル
+class EncoderLayer(nn.Module):
+    def __init__(self, hidden_dim=128, ff_hidden_dim=512):
+        super().__init__()
+        self.device = get_device()
+        self.mha = nn.MultiheadAttention(hidden_dim, num_heads=8, batch_first=True)
+        self.norm1 = nn.BatchNorm1d(hidden_dim)
+        self.norm2 = nn.BatchNorm1d(hidden_dim)
+        self.ff = nn.Sequential(
+            nn.Linear(hidden_dim, ff_hidden_dim),
+            nn.ReLU(),
+            nn.Linear(ff_hidden_dim, hidden_dim)
+        )
+    
+    def forward(self, h):
+        # Multi-head attention + skip + BN
+        h_attn, _ = self.mha(h, h, h)
+        # print("h_attn.shape:", h_attn.shape)
+        h = self.norm1((h + h_attn).squeeze(0)).unsqueeze(0)  # shape: (1, 5, 128)
+
+        # Feed Forward Network
+        h_ff = self.ff(h)
+        h = self.norm2((h + h_ff).squeeze(0)).unsqueeze(0)
+        return h  # N, D
+
 class Encoder(nn.Module):
-    def __init__(self, input_dim=2, hidden_dim=128):
+    def __init__(self, input_dim=2, hidden_dim=128, ff_hidden_dim=512, n_layers=3):
         super().__init__()
         self.device = get_device()
         self.conv1 = GCNConv(input_dim, hidden_dim)
-        self.relu = nn.ReLU()
-        self.mha = nn.MultiheadAttention(hidden_dim, num_heads=8)
-
+        self.layers = nn.ModuleList([
+            EncoderLayer(hidden_dim, ff_hidden_dim) for _ in range(n_layers)
+        ])
+        
     def forward(self, data):
         ''' 順伝播 '''
         x, edge_index, edge_weight = data.x, data.edge_index, data.edge_weight
-        h_gnn = self.conv1(x, edge_index, edge_weight)
-        h = h_gnn.unsqueeze(0)  # shape: (1, 5, 128)
-        # h, _ = self.mha(h, h, h)
+        h = self.conv1(x, edge_index, edge_weight)
+        h = h.unsqueeze(0)  # shape: (1, 5, 128)
+        # print("GNN h.shape:", h.shape)
+
+        for layer in self.layers:
+            h = layer(h)
+        
         graph_embed = h.mean(dim=1)
-        print("h.shape:", h.shape)
+        # print("last h.shape:", h.shape)
+        # print("graph_embed.shape:", graph_embed.shape)
         return h, graph_embed
 
 class Decoder(nn.Module):
@@ -136,18 +166,18 @@ def main():
     # モデルの計算
     node_embeddings, graph_embed = encoder(data)
 
-    print("node_embeddings.shape:", node_embeddings.shape)
-    print("graph_embed.shape:", graph_embed.shape)
+    # print("node_embeddings.shape:", node_embeddings.shape)
+    # print("graph_embed.shape:", graph_embed.shape)
 
-    ''' Decoder '''
-    decoder = Decoder().to(device)
-    # t=0の時
-    h_last = torch.empty(0, device=device)
-    h_first = torch.empty(0, device=device)
-    visited_mask = torch.zeros((1, num_nodes), dtype=torch.bool, device=device)
-    print("visited_mask:", visited_mask)
-    probs, logits = decoder(node_embeddings, graph_embed, h_last, h_first, visited_mask, 0)
-    print(f"probs:", probs)
+    # ''' Decoder '''
+    # decoder = Decoder().to(device)
+    # # t=0の時
+    # h_last = torch.empty(0, device=device)
+    # h_first = torch.empty(0, device=device)
+    # visited_mask = torch.zeros((1, num_nodes), dtype=torch.bool, device=device)
+    # print("visited_mask:", visited_mask)
+    # probs, logits = decoder(node_embeddings, graph_embed, h_last, h_first, visited_mask, 0)
+    # print(f"probs:", probs)
 
 if __name__ == '__main__':
     main()
