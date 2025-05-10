@@ -19,33 +19,6 @@ import sys
 #     [45, 94],
 #     [58, 28],
 # ])
-input_data = np.array([
-    [34, 83],
-    [54,  0],
-    [21,  5],
-    [ 4, 63],
-    [59, 55],
-    [24, 89],
-    [75, 83],
-    [ 6, 94],
-    [52, 97],
-    [18, 85],
-    [35, 77],
-    [33, 97],
-    [11, 23],
-    [24, 71],
-    [ 9, 98],
-    [31, 66],
-    [98, 89],
-    [74, 59],
-    [11, 29],
-    [50, 83],
-    [10, 78],
-    [81, 83],
-    [ 2, 75],
-    [48, 37],
-    [43, 86]
-])
 # input_data = np.array([
 #     [34, 83],
 #     [54,  0],
@@ -57,7 +30,34 @@ input_data = np.array([
 #     [ 6, 94],
 #     [52, 97],
 #     [18, 85],
+#     [35, 77],
+#     [33, 97],
+#     [11, 23],
+#     [24, 71],
+#     [ 9, 98],
+#     [31, 66],
+#     [98, 89],
+#     [74, 59],
+#     [11, 29],
+#     [50, 83],
+#     [10, 78],
+#     [81, 83],
+#     [ 2, 75],
+#     [48, 37],
+#     [43, 86]
 # ])
+input_data = np.array([
+    [34, 83],
+    [54,  0],
+    [21,  5],
+    [ 4, 63],
+    [59, 55],
+    [24, 89],
+    [75, 83],
+    [ 6, 94],
+    [52, 97],
+    [18, 85],
+])
 
 def plot_route(reward_history):
     # 最小トータルリワードのエピソードを取得
@@ -125,7 +125,6 @@ def main(model_path='save/model.pth', episodes=100, plot=False):
 
     # config を使ってAgent構築
     agent = Agent(
-        hidden_size=config["hidden_size"],
         lr=config["lr"],
         gamma=config["gamma"]
     )
@@ -138,19 +137,19 @@ def main(model_path='save/model.pth', episodes=100, plot=False):
 
     for episode in range(episodes):
         # print('episode:', episode)
-        data, state = env.reset()
+        data, visited_cities = env.reset()
+        agent.encoder_forward(data)
         done = False
         total_reward = 0
         visit_orders = []
 
         while not done:
-            action, probs = agent.get_action(data, state)
+            action, probs = agent.get_action(visited_cities)
             visit_orders.append(action)
-            next_data, next_state, reward, done = env.step(action)
+            next_visited_cities, reward, done = env.step(action)
             
             total_reward += reward
-            state = next_state
-            data = next_data
+            visited_cities = next_visited_cities
 
         reward_history.append({
             "total_reward": total_reward,

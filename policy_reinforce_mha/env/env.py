@@ -11,7 +11,7 @@ from torch_geometric.utils import to_undirected
 
 
 class TSPEnv:
-    def __init__(self, batch_size=1 ,n_cities=5, coord_dim=2, fixed_coords=None):
+    def __init__(self, batch_size=1 ,n_cities=10, coord_dim=2, fixed_coords=None):
         """
         TSP環境の初期化
         """

@@ -8,7 +8,7 @@ from agent.agent import Agent
 import json
 import matplotlib.pyplot as plt
 
-def main(lr=1e-4, gamma=0.99, hidden_size=4, episodes=100, save_path="model.pth"):
+def main(lr=1e-4, gamma=0.99, episodes=100, save_path="model.pth"):
     env = TSPEnv()
     agent = Agent(lr=lr, gamma=gamma)
     reward_history = []
@@ -63,7 +63,6 @@ def main(lr=1e-4, gamma=0.99, hidden_size=4, episodes=100, save_path="model.pth"
     config = {
         "lr": lr,
         "gamma": gamma,
-        "hidden_size": hidden_size
     }
     json_path = save_path.replace(".pth", ".json")
     with open(json_path, "w") as f:
