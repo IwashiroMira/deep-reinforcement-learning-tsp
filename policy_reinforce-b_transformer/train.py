@@ -45,7 +45,7 @@ def main(lr=1e-4, gamma=0.99, episodes=1000, save_path="model.pth"):
 
         # print(f'Episode: {episode}, Total Reward: {total_reward}')
 
-        if episode % 50 == 0:
+        if episode % 500 == 0:
             print(f'Episode: {episode}, Total Reward: {total_reward}')
             print(f'visit_orders:{visit_orders}')
     
