@@ -51,10 +51,9 @@ class Agent:
         probs, _ = self.decoder(self.node_embeddings, self.graph_embed, h_last, h_first, visited_mask, t)
         # print("probs:", probs)
         # ノードを確率的に選ぶ（探索的）
-        action = torch.multinomial(probs, num_samples=1).item()  # → int 値
-        # print("selected_city:", action)
-
-        return action, probs
+        probs = probs.squeeze(0)  # shape: [10] に変換
+        action = torch.multinomial(probs, num_samples=1).item()  # 0〜9の整数
+        return action, probs[action]
     
     def add(self, reward, action_probs):
         self.memory.append((reward, action_probs))
