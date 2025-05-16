@@ -42,8 +42,8 @@ class TSPEnv:
         # 座標を生成
         self._generate_coords()
         # print(f'coords: {self.coords}')
-        self.visted_cities = np.zeros(self.n_cities)  # 訪問済み都市
-        # print(f'visted_cities: {self.visted_cities}')
+        self.visited_cities = np.zeros(self.n_cities)  # 訪問済み都市
+        # print(f'visited_cities: {self.visited_cities}')
         self.total_distance = 0  # 総移動距離
         self.current_city = 0  # 現在の都市
         self.done = False
@@ -51,29 +51,8 @@ class TSPEnv:
         
         # state = self._get_state()
         data = self._get_data()
-        return data, self.visted_cities
+        return data, self.visited_cities
 
-    # def _get_state(self):
-    #     """
-    #     現在の状態を返す
-    #     :return: 現在の状態
-    #     """
-    #     # 訪問済みをワンホットエンコーディング
-    #     visited = self.visted_cities.astype(int).reshape(-1, 1)
-    #     one_hot_visited = np.zeros((self.n_cities, 2))
-
-    #     # 未訪問の都市は[1, 0]、訪問済みの都市は[0, 1]とする
-    #     one_hot_visited[visited[:, 0] == 0, 0] = 1  # 未訪問フラグ
-    #     one_hot_visited[visited[:, 0] > 0, 1] = 1  # 訪問済みフラグ
-    
-    
-    #     state_np = np.hstack([
-    #         self.coords,  # 都市の座標
-    #         one_hot_visited,  # 訪問済みフラグ
-    #     ])
-    #     state = torch.tensor(state_np, dtype=torch.float32)
-    #     return state
-    
     def _get_data(self):
         if isinstance(self.coords, np.ndarray):
             self.coords = torch.tensor(self.coords, dtype=torch.float32)
@@ -110,25 +89,29 @@ class TSPEnv:
         # 報酬の計算（現在地→次の都市の距離）
         reward = self._get_distance(action)
 
-        self.visted_cities[action] = self.step_counte  # 訪問済み都市に追加
+        self.visited_cities[action] = self.step_counte  # 訪問済み都市に追加
         self.step_counte += 1
 
         # print('env.py step')
-        # print(f'visited_cities: {self.visted_cities}')
+        # print(f'visited_cities: {self.visited_cities}')
         
         self.current_city = action
+        # print(f'current_city: {self.current_city}')
         
-        # if np.sum(self.visted_cities) == self.n_cities:
-        if np.all(self.visted_cities > 0):
+        # if np.sum(self.visited_cities) == self.n_cities:
+        if np.all(self.visited_cities > 0):
             # print('All cities visited')
             # 最後の都市と最初の都市の距離を追加
-            reward += self._get_distance(0)
+            first_city = np.where(self.visited_cities == 1)[0][0]
+            # print(f'first_city: {first_city}')
+            reward += self._get_distance(first_city)
 
             # エピソード終了判定
             self.done = True
         
-        self.total_distance += reward
-        next_visited_cities = self.visted_cities.copy()  # 次の状態は訪問済み都市のコピー
+        # self.total_distance += reward
+        # print(f'total_reward_env: {self.total_distance}')
+        next_visited_cities = self.visited_cities.copy()  # 次の状態は訪問済み都市のコピー
 
         return next_visited_cities, reward, self.done
 

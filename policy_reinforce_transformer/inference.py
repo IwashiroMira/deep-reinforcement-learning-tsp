@@ -64,10 +64,11 @@ def plot_route(reward_history):
     best_episode = max(reward_history, key=lambda x: x["total_reward"])
     best_reward = best_episode["total_reward"]
     best_order = best_episode["visit_orders"]
+    print(best_order)
 
 
     # 訪問順序の最初と最後に 0 を追加して巡回経路にする
-    best_order = [0] + best_order + [0]
+    best_order.append(best_order[0])
 
     # 訪問順序に基づく座標を取得
     ordered_coords = [input_data[i] for i in best_order]
