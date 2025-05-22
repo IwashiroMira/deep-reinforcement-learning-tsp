@@ -2,13 +2,13 @@ import sys
 import os
 # プロジェクトのルートディレクトリを追加
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
-
+import torch
 from env.env import TSPEnv
 from agent.agent import Agent
 import json
 import matplotlib.pyplot as plt
 
-def main(lr=1e-4, gamma=0.99, episodes=100, save_path="model.pth"):
+def main(lr=1e-4, gamma=0.99, episodes=1000, save_path="model.pth"):
     env = TSPEnv()
     agent = Agent(lr=lr, gamma=gamma)
     reward_history = []
@@ -16,12 +16,13 @@ def main(lr=1e-4, gamma=0.99, episodes=100, save_path="model.pth"):
     for episode in range(episodes):
         # print('episode:', episode)
         data, visited_cities = env.reset()
+        batch_size = visited_cities.shape[0]
         agent.encoder_forward(data)
-        done = False
+        done = torch.zeros(batch_size, dtype=torch.bool)
         total_reward = 0
         visit_orders = []
 
-        while not done:
+        while not done.all():
             # print('train get_action')
             action, probs = agent.get_action(visited_cities)
             # print('probs:', probs)
@@ -29,6 +30,7 @@ def main(lr=1e-4, gamma=0.99, episodes=100, save_path="model.pth"):
             visit_orders.append(action)
 
             next_visited_cities, reward, done = env.step(action)
+            # print(f"done: {done}")
             # print(f'reward: {reward}')
             # print('next_state:')
             # print(next_state)
