@@ -11,14 +11,14 @@ from torch_geometric.utils import to_undirected
 
 
 class TSPEnv:
-    def __init__(self, batch_size=1 ,n_cities=10, coord_dim=2, fixed_coords=None):
+    def __init__(self, batch_size=1 ,n_cities=25, coord_dim=2, fixed_coords=None):
         """
         TSP環境の初期化
         """
         self.batch_size = batch_size  # バッチサイズ
         self.n_cities = n_cities  # 都市の数
         self.coord_dim = coord_dim  # 座標の次元（例: x, y）
-        self.data_coord_max = 100  # 座標の最大値
+        self.data_coord_max = 1  # 座標の最大値
         self.fixed_coords = fixed_coords  # 固定された都市の座標
         self.device = get_device()
     
@@ -45,7 +45,7 @@ class TSPEnv:
         self.visited_cities = np.zeros(self.n_cities)  # 訪問済み都市
         # print(f'visited_cities: {self.visited_cities}')
         self.total_distance = 0  # 総移動距離
-        self.current_city = 0  # 現在の都市
+        self.current_city = -1  # 現在の都市
         self.done = False
         self.step_counte = 1
         
@@ -123,8 +123,11 @@ class TSPEnv:
         :return: 総移動距離
         """
         # 現在の都市とactionの都市の距離を取得する
-        distance = np.linalg.norm(self.coords[self.current_city] - self.coords[action])
-        return -1 * distance
+        if self.current_city == -1:
+            distance = 0.0
+        else:
+            distance = -1 * np.linalg.norm(self.coords[self.current_city] - self.coords[action])
+        return distance
 
 
 # 動作確認   
@@ -132,8 +135,9 @@ def main():
     print('env.py main')
     env = TSPEnv()
     env.reset()
+    action_list = [1, 4, 0, 2, 3]
 
-    for i in range(0,5):
+    for i in action_list:
         action = i
         print(f'Action: {action}')
         next_visited_cities, reward, done = env.step(action)
