@@ -30,7 +30,7 @@ class PolicyGCNLSTM(nn.Module):
     def encode(self, x, edge_index, edge_weight):
         ''' グラフの特徴量をエンコードする '''
         x = self.conv1(x, edge_index, edge_weight)
-        x = self.relu(x)
+        # x = self.relu(x)
         # x = self.conv2(x, edge_index, edge_weight)
         # x = self.relu(x)
         return x
@@ -63,10 +63,8 @@ class PolicyGCNLSTM(nn.Module):
         probs = torch.softmax(scores, dim=0)  # [10]
         
         # next_node = torch.argmax(probs).item()  # ← これが次に訪問するノード！
-        next_node = torch.multinomial(probs, num_samples=1).item()
-
-        return [next_node, probs]
-
+        action = torch.multinomial(probs, num_samples=1).item()
+        return action, probs[action]
 
 def main():
     device = get_device()

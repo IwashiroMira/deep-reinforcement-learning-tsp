@@ -43,9 +43,9 @@ def main(lr=1e-4, gamma=0.99, hidden_size=4, episodes=100, save_path="model.pth"
 
         # print(f'Episode: {episode}, Total Reward: {total_reward}')
 
-        if episode % 50 == 0:
+        if episode % 100 == 0:
             print(f'Episode: {episode}, Total Reward: {total_reward}')
-            print(state)
+            # print(state)
             print(f'visit_orders:{visit_orders}')
     
     # save model
