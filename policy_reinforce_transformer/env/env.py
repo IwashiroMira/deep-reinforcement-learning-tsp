@@ -11,7 +11,7 @@ from torch_geometric.utils import to_undirected
 
 
 class TSPEnv:
-    def __init__(self, batch_size=2 ,n_cities=10, coord_dim=2, fixed_coords=None):
+    def __init__(self, batch_size=1 ,n_cities=1, coord_dim=2, fixed_coords=None):
         """
         TSP環境の初期化
         """
@@ -27,7 +27,7 @@ class TSPEnv:
         都市の座標を生成
         """
         if self.fixed_coords is not None:
-            self.coords = self.fixed_coords
+            self.coords = torch.tensor(self.fixed_coords, dtype=torch.float32).unsqueeze(0)
         else:
             self.coords = np.random.rand(self.batch_size, self.n_cities, self.coord_dim) * self.data_coord_max
             # self.coords = coords.squeeze()

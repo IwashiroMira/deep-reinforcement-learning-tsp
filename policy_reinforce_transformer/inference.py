@@ -46,26 +46,26 @@ input_data = np.array([
     [0.47916667, 0.37755102],
     [0.42708333, 0.87755102]
 ])
-input_data = np.array([
-    [34, 83],
-    [54,  0],
-    [21,  5],
-    [ 4, 63],
-    [59, 55],
-    [24, 89],
-    [75, 83],
-    [ 6, 94],
-    [52, 97],
-    [18, 85],
-])
+# input_data = np.array([
+#     [34, 83],
+#     [54,  0],
+#     [21,  5],
+#     [ 4, 63],
+#     [59, 55],
+#     [24, 89],
+#     [75, 83],
+#     [ 6, 94],
+#     [52, 97],
+#     [18, 85],
+# ])
 
 def plot_route(reward_history):
     # 最小トータルリワードのエピソードを取得
     best_episode = max(reward_history, key=lambda x: x["total_reward"])
     best_reward = best_episode["total_reward"]
     best_order = best_episode["visit_orders"]
-    print(best_order)
-
+    visit_order_list = [v.item() for v in best_order]
+    print(visit_order_list)
 
     # 訪問順序の最初と最後に 0 を追加して巡回経路にする
     best_order.append(best_order[0])
@@ -129,7 +129,7 @@ def main(model_path='save/model.pth', episodes=100, plot=False):
         lr=config["lr"],
         gamma=config["gamma"]
     )
-    env = TSPEnv(fixed_coords=input_data)
+    env = TSPEnv(batch_size=1, n_cities=25, fixed_coords=input_data)
     reward_history = []
     reward_history_random = []
 
@@ -185,7 +185,7 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument("model_path", nargs='?', default="save/model.pth")
     parser.add_argument("--plot", action="store_true", help="プロットを表示するかどうか")
-    parser.add_argument("--episodes", type=int, default=100)
+    parser.add_argument("--episodes", type=int, default=1000)
     args = parser.parse_args()
 
     main(args.model_path, args.episodes, plot=args.plot)
