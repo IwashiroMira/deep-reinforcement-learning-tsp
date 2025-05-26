@@ -8,8 +8,17 @@ from agent.agent import Agent
 import json
 import matplotlib.pyplot as plt
 import numpy as np
+import logging
 
-def main(lr=1e-4, gamma=0.99, episodes=1000, save_path="model.pth"):
+# ログ設定
+logging.basicConfig(
+    filename='training.log',  # 出力先ファイル
+    filemode='a',             # 'w' だと毎回上書き、'a' なら追記
+    level=logging.INFO,       # ログレベル
+    format='%(asctime)s - %(levelname)s - %(message)s'
+)
+
+def main(lr=1e-4, gamma=0.99, episodes=10, save_path="save/model.pth"):
     env = TSPEnv(batch_size=100, n_cities=25)
     agent = Agent(lr=lr, gamma=gamma)
     reward_history = []
@@ -46,13 +55,15 @@ def main(lr=1e-4, gamma=0.99, episodes=1000, save_path="model.pth"):
 
         # print(f'Episode: {episode}, Total Reward: {total_reward}')
 
-        if episode % 1000 == 0:
+        if episode % 5 == 0:
             rewards = np.array(total_reward)
             mean = rewards.mean()
             std = rewards.std()
             min_ = rewards.min()
             max_ = rewards.max()            
             print(f"Episode: {episode}, Mean: {mean:.3f}, Std: {std:.3f}, Min: {min_}, Max: {max_}")
+            log_msg = f"Episode: {episode}, Mean: {mean:.3f}, Std: {std:.3f}, Min: {min_}, Max: {max_}"
+            logging.info(log_msg)     # ログファイルに記録
     
     # save model
     agent.save_model(save_path)
@@ -61,14 +72,18 @@ def main(lr=1e-4, gamma=0.99, episodes=1000, save_path="model.pth"):
     # --- ここからプロット部分 ---
     reward_history = np.array(reward_history)  # shape: (episodes, batch_size)
     mean_rewards = reward_history.mean(axis=1)
-
+    plt.figure()
     plt.plot(mean_rewards, label='Mean Reward')
     plt.title("Average Total Reward per Episode")
     plt.xlabel("Episode")
     plt.ylabel("Average Total Reward")
     plt.grid(True)
     plt.legend()
-    plt.show()
+    # plt.show()
+    png_path = save_path.replace(".pth", ".png")
+    plt.savefig(png_path)
+    plt.close()  # 状態をリセット（重要）
+
     
     # save config
     config = {

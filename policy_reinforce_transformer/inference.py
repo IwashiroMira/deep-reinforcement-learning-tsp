@@ -87,7 +87,9 @@ def plot_route(reward_history):
     plt.title(f'Best Route with Total Reward: {-1 * best_reward}')
     plt.legend()
     plt.grid(True)
-    plt.show()
+    plt.savefig(f"Best Route")
+    plt.close()  # 状態をリセット（重要）
+    # plt.show()
 
 def plot_reward_history(reward_history_rl, reward_history_random):
     plt.figure(figsize=(10, 6))
@@ -99,7 +101,9 @@ def plot_reward_history(reward_history_rl, reward_history_random):
     plt.title('Total Reward History')
     plt.legend()
     plt.grid(True)
-    plt.show()
+    plt.savefig(f"Best Route Reward History")
+    plt.close()  # 状態をリセット（重要）
+    # plt.show()
 
 def calc_distance_random_order(input_data):
     # 訪問順序をランダムに生成
@@ -118,7 +122,7 @@ def calc_distance_random_order(input_data):
     return total_distance
 
 
-def main(model_path='save/model.pth', episodes=100, plot=False):
+def main(model_path='save/model.pth', episodes=100, plot=True):
     # 同名の .json ファイルからパラメータ読み込み
     config_path = model_path.replace(".pth", ".json")
     with open(config_path, "r") as f:
