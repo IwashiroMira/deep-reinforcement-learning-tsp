@@ -19,7 +19,7 @@ logging.basicConfig(
 )
 
 def main(lr=1e-4, gamma=0.99, episodes=10, save_path="save/model.pth"):
-    env = TSPEnv(batch_size=100, n_cities=25)
+    env = TSPEnv(batch_size=512, n_cities=25)
     agent = Agent(lr=lr, gamma=gamma)
     reward_history = []
 
@@ -55,7 +55,7 @@ def main(lr=1e-4, gamma=0.99, episodes=10, save_path="save/model.pth"):
 
         # print(f'Episode: {episode}, Total Reward: {total_reward}')
 
-        if episode % 5 == 0:
+        if episode % 1000 == 0:
             rewards = np.array(total_reward)
             mean = rewards.mean()
             std = rewards.std()

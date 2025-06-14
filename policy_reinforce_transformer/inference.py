@@ -65,11 +65,12 @@ def plot_route(reward_history):
     best_reward = best_episode["total_reward"]
     best_order = best_episode["visit_orders"]
     visit_order_list = [v.item() for v in best_order]
-    print(visit_order_list)
+    print(f"visit_order_list: {visit_order_list}")
+    print(f'best_reward: {best_reward}')
 
     # 訪問順序の最初と最後に 0 を追加して巡回経路にする
     best_order.append(best_order[0])
-
+    
     # 訪問順序に基づく座標を取得
     ordered_coords = [input_data[i] for i in best_order]
 
@@ -178,11 +179,10 @@ def main(model_path='save/model.pth', episodes=100, plot=True):
     if plot:
         plot_route(reward_history)  # 最短経路のプロット
         plot_reward_history(reward_history_rl, reward_history_random)
-    
 
-    # best_reward = min(reward_history_rl)
-    best_reward = np.mean(reward_history_rl) 
-    print(best_reward)
+    min_reward = min(reward_history_rl)  # 最小値
+    # mean_reward = np.mean(reward_history_rl) 
+    print(float(min_reward.item()))  # 文字列入れない、optunaでエラーになる
 
 
 if __name__ == '__main__':

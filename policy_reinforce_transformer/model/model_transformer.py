@@ -124,6 +124,7 @@ class Decoder(nn.Module):
         # print("v.shape:", v.shape)
 
         # 3. Attentionの計算
+        # print(f"visited_mask: {visited_mask}")
         attn_output, attn_weights = self.mha(q, k, v, key_padding_mask=visited_mask)  # shape: (1, B, D)
         # print("attn_output.shape:", attn_output.shape)
         h_c_new = attn_output.squeeze(1)  # shape: (B, D)
@@ -138,6 +139,7 @@ class Decoder(nn.Module):
         # 5. クリッピングとマスク
         logits = self.tanh_clipping * torch.tanh(logits)
         logits = logits.masked_fill(visited_mask, float('-inf'))  # 訪問済み都市をマスク
+        # print("after mask logits.shape:", logits.shape)
 
         # 6. softmax
         probs = torch.softmax(logits, dim=-1)  # shape: (B, N)
