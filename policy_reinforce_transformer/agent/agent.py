@@ -8,12 +8,13 @@ from model.model_transformer import Decoder
 import torch
 from torch import optim
 from utils import get_device
+from env.env import TSPEnv
 from torch_geometric.data import Data
 import numpy as np
 
 
 class Agent:
-    def __init__(self, lr=1e-4, gamma=0.99):
+    def __init__(self, lr=1e-5, gamma=0.99):
         self.gamma = gamma  # 割引率
         self.lr = lr  # 学習率
         self.memory = []
@@ -31,7 +32,9 @@ class Agent:
         # print("graph_embed.shape:", self.graph_embed.shape)
 
     def get_action(self, visited_cities):
-        visited_mask = torch.tensor(visited_cities, dtype=torch.bool, device=self.device).unsqueeze(0)  # shape: (1, 5)
+        B, N, D = self.node_embeddings.shape  # B: バッチサイズ, N: 都市の数, D: 埋め込み次元
+        # print("visited_cities.shape:", visited_cities.shape)
+        visited_mask = torch.tensor(visited_cities, dtype=torch.bool, device=self.device)  # shape: (1, 5)
         # print("visited_mask.shape:", visited_mask.shape)
         # print("visited_mask:", visited_mask)
 
@@ -42,21 +45,36 @@ class Agent:
             t = 0
         else:
             first_index = np.where(visited_cities == 1)[0][0]
-            last_index = np.argmax(visited_cities)
+            first_index = np.array([
+                np.where(row == 1)[0][0] for row in visited_cities
+            ])
+            last_index = np.argmax(visited_cities,axis=1)
             # print(f"first_index: {first_index}, last_index: {last_index}")
-            h_first = self.node_embeddings[0, first_index, :].unsqueeze(0)  # shape: (1, 128)
-            h_last = self.node_embeddings[0, last_index, :].unsqueeze(0)  # shape: (1, 128)
+            
+            h_first = self.node_embeddings[torch.arange(B), first_index, :]  # shape: (B, D)
+            h_last  = self.node_embeddings[torch.arange(B), last_index, :]   # shape: (B, D)
+
+            # print("agent h_first.shape:", h_first.shape)
+            # print("agent h_last.shape:", h_last.shape)
             t = visited_mask.sum().item()  # 訪問済み都市の数
         
         probs, _ = self.decoder(self.node_embeddings, self.graph_embed, h_last, h_first, visited_mask, t)
+        # print("probs.shape:", probs.shape)
         # print("probs:", probs)
         # ノードを確率的に選ぶ（探索的）
-        probs = probs.squeeze(0)  # shape: [10] に変換
-        action = torch.multinomial(probs, num_samples=1).item()  # 0〜9の整数
-        return action, probs[action]
+        # バッチ対応版（actionは shape: (B,) のテンソル）
+        actions = torch.multinomial(probs, num_samples=1).squeeze(1)  # shape: (B,)
+        # print("actions.shape:", actions.shape)
+        # print("actions:", actions)
+        selected_probs = probs[torch.arange(B), actions]
+        # print(selected_probs) 
+
+        return actions, selected_probs
     
     def add(self, reward, action_probs):
+        reward = torch.tensor(reward, dtype=torch.float32, device=self.device)  # ← ここ重要
         self.memory.append((reward, action_probs))
+        # print(f"memory: {self.memory}")
 
     def update(self):
         G, loss = 0, 0
@@ -65,8 +83,9 @@ class Agent:
         for reward, action_probs in reversed(self.memory):
             # print(f"action_probs: {action_probs}")
             G = reward + self.gamma * G
+            # print(f"G: {G}")
             loss += -torch.log(action_probs + EPS) * G  # EPSがないとlog(0)でエラーになる
-        
+            # print(f"loss: {loss}")
         loss = loss.sum()
         
         self.optimizer.zero_grad()
@@ -106,42 +125,25 @@ class Agent:
         self.decoder.to(self.device)    
 
 def main():
+    env = TSPEnv(batch_size=2, n_cities=5)
     agent = Agent()
-
-    device = get_device()
-
-    state = torch.tensor([
-        [95.02370691, 54.86014805],
-        [79.64110929, 9.31860416],
-        [37.19301454, 14.77507159],
-        [62.41494659, 80.49261453],
-        [28.36552228, 90.45835087]
-    ], dtype=torch.float32)
-
-    # 都市数
-    num_nodes = state.shape[0]
-
-    # すべての都市ペアを生成（i ≠ j）
-    edges = list(combinations(range(num_nodes), 2))
-
-    # edge_index の作成
-    edge_index = torch.tensor(edges, dtype=torch.long).T  # 転置して (2, N) の形にする
-
-    # ユークリッド距離を計算してエッジの重みとする
-    edge_weight = torch.norm(state[edge_index[0]] - state[edge_index[1]], dim=1)
-
-    # Min-Maxスケーリングを追加 (0~1に正規化)
-    edge_weight = (edge_weight - edge_weight.min()) / (edge_weight.max() - edge_weight.min())
-
-    # `torch_geometric.data.Data` オブジェクト作成
-    data = Data(x=state.to(device), edge_index=edge_index.to(device), edge_weight=edge_weight.to(device))
+    data, visited_cities = env.reset()
+    # print(f'visited_cities: {visited_cities}')
+    # agent.encoder_forward(data)
     
-    visited_cities = np.array([0, 2, 1, 0, 3])  # 各都市の訪問ステップ
+    visited_cities_zero = np.array([[0, 0, 0, 0, 0],
+                               [0, 0, 0, 0, 0]])  # 各都市の訪問ステップ
     agent.encoder_forward(data)
-    agent.get_action(visited_cities)
-    # nex_node, probs = agent.get_action(data, state)
-    # print('next_node:', nex_node)
-    # print('probs:', probs)
+    action, probs = agent.get_action(visited_cities_zero)
+    print('action:', action)
+    print('probs:', probs)
+
+    visited_cities = np.array([[0, 2, 1, 0, 3],
+                               [1, 2, 3, 0, 0]])  # 各都市の訪問ステップ
+    agent.encoder_forward(data)
+    action, probs = agent.get_action(visited_cities)
+    print('action:', action)
+    print('probs:', probs)
 
 if __name__ == '__main__':
     main()

@@ -64,12 +64,13 @@ def plot_route(reward_history):
     best_episode = max(reward_history, key=lambda x: x["total_reward"])
     best_reward = best_episode["total_reward"]
     best_order = best_episode["visit_orders"]
-    print(best_order)
-
+    visit_order_list = [v.item() for v in best_order]
+    print(f"visit_order_list: {visit_order_list}")
+    print(f'best_reward: {best_reward}')
 
     # 訪問順序の最初と最後に 0 を追加して巡回経路にする
     best_order.append(best_order[0])
-
+    
     # 訪問順序に基づく座標を取得
     ordered_coords = [input_data[i] for i in best_order]
 
@@ -87,7 +88,9 @@ def plot_route(reward_history):
     plt.title(f'Best Route with Total Reward: {-1 * best_reward}')
     plt.legend()
     plt.grid(True)
-    plt.show()
+    plt.savefig(f"Best Route")
+    plt.close()  # 状態をリセット（重要）
+    # plt.show()
 
 def plot_reward_history(reward_history_rl, reward_history_random):
     plt.figure(figsize=(10, 6))
@@ -99,7 +102,9 @@ def plot_reward_history(reward_history_rl, reward_history_random):
     plt.title('Total Reward History')
     plt.legend()
     plt.grid(True)
-    plt.show()
+    plt.savefig(f"Best Route Reward History")
+    plt.close()  # 状態をリセット（重要）
+    # plt.show()
 
 def calc_distance_random_order(input_data):
     # 訪問順序をランダムに生成
@@ -118,7 +123,7 @@ def calc_distance_random_order(input_data):
     return total_distance
 
 
-def main(model_path='save/model.pth', episodes=1000, plot=False):
+def main(model_path='save/model.pth', episodes=100, plot=True):
     # 同名の .json ファイルからパラメータ読み込み
     config_path = model_path.replace(".pth", ".json")
     with open(config_path, "r") as f:
@@ -129,7 +134,7 @@ def main(model_path='save/model.pth', episodes=1000, plot=False):
         lr=config["lr"],
         gamma=config["gamma"]
     )
-    env = TSPEnv(fixed_coords=input_data)
+    env = TSPEnv(batch_size=1, n_cities=25, fixed_coords=input_data)
     reward_history = []
     reward_history_random = []
 
@@ -174,11 +179,10 @@ def main(model_path='save/model.pth', episodes=1000, plot=False):
     if plot:
         plot_route(reward_history)  # 最短経路のプロット
         plot_reward_history(reward_history_rl, reward_history_random)
-    
 
-    # best_reward = min(reward_history_rl)
-    best_reward = np.mean(reward_history_rl) 
-    print(best_reward)
+    min_reward = min(reward_history_rl)  # 最小値
+    # mean_reward = np.mean(reward_history_rl) 
+    print(float(min_reward.item()))  # 文字列入れない、optunaでエラーになる
 
 
 if __name__ == '__main__':
