@@ -8,8 +8,8 @@ import logging
 def objective(trial):
     # パラメータの提案
     gamma = trial.suggest_float("gamma", 0.90, 0.99)
-    lr = trial.suggest_float("lr", 1e-6, 1e-4, log=True)
-    episodes = trial.suggest_int("episodes", 25000, 30000, step=1000)  # 100, 110, 120, ...
+    lr = trial.suggest_float("lr", 1e-6, 1e-3, log=True)
+    episodes = trial.suggest_int("episodes", 20000, 30000, step=1000)  # 100, 110, 120, ...
     
     # モデルパスの定義
     model_path = f"save/model_trial_{trial.number}_lr{lr:.5f}_g{gamma:.3f}.pth"

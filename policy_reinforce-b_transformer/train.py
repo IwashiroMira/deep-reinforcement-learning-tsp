@@ -13,6 +13,7 @@ import logging
 import copy
 from scipy.stats import ttest_rel
 from tqdm import tqdm
+from config import environment, training
 
 
 # ログ設定
@@ -23,21 +24,21 @@ logging.basicConfig(
     format='%(asctime)s - %(levelname)s - %(message)s'
 )
 
-def main(lr=1e-4, gamma=0.95, episodes=50, save_path="save/model.pth"):
-    env = TSPEnv(batch_size=512, n_cities=25)
+def main(lr=1e-6, gamma=0.95, episodes=training["episodes"], save_path="save/model.pth"):
+    env = TSPEnv(batch_size=training["batch_size"], n_cities=environment["num_cities"])
     agent = Agent(lr=lr, gamma=gamma)
     baseline = BaseLine(lr=lr, gamma=gamma)
     baseline.model.load_state_dict(copy.deepcopy(agent.model.state_dict()))
     reward_history = []
     baseline_reward_history = []
 
-    for episode in tqdm(range(episodes)):
+    for episode in range(episodes):
         # print('episode:', episode)
         # 1. 環境の座標を生成
         env.generate_coords()  # 都市の座標を生成
         # 2. Baseline用の環境（同じ座標を固定）
         fixed_coords = env.coords.copy()  # 現在の座標をコピー
-        baseline_env = TSPEnv(batch_size=512, n_cities=25, fixed_coords=fixed_coords)
+        baseline_env = TSPEnv(batch_size=training["batch_size"], n_cities=environment["num_cities"], fixed_coords=fixed_coords)
         baseline_env.generate_coords()  # 固定された座標を使用して環境を初期化
 
         # 3. AgentとBaselineの環境をリセット
@@ -93,16 +94,15 @@ def main(lr=1e-4, gamma=0.95, episodes=50, save_path="save/model.pth"):
         baseline_reward_history.append(baseline_total_reward)
 
         # print(f'Episode: {episode}, Total Reward: {total_reward}')
-
-        # if episode % 1000 == 0:
-        rewards = np.array(agent_total_reward)
-        mean = rewards.mean()
-        std = rewards.std()
-        min_ = rewards.min()
-        max_ = rewards.max()            
-        print(f"Episode: {episode}, Mean: {mean:.3f}, Std: {std:.3f}, Min: {min_}, Max: {max_}")
-        log_msg = f"Episode: {episode}, Mean: {mean:.3f}, Std: {std:.3f}, Min: {min_}, Max: {max_}"
-        logging.info(log_msg)     # ログファイルに記録
+        if episode % 100 == 0:
+            rewards = np.array(agent_total_reward)
+            mean = rewards.mean()
+            std = rewards.std()
+            min_ = rewards.min()
+            max_ = rewards.max()            
+            print(f"Episode: {episode}, Mean: {mean:.3f}, Std: {std:.3f}, Min: {min_}, Max: {max_}")
+            log_msg = f"Episode: {episode}, Mean: {mean:.3f}, Std: {std:.3f}, Min: {min_}, Max: {max_}"
+            logging.info(log_msg)     # ログファイルに記録
     
     # save model
     agent.save_model(save_path)
