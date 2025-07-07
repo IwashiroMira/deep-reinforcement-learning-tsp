@@ -10,6 +10,7 @@ from agent.agent import Agent
 import json
 import argparse
 import sys
+from config import environment, inference
 
 
 # input_data = np.array([
@@ -19,6 +20,88 @@ import sys
 #     [45, 94],
 #     [58, 28],
 # ])
+input_data = np.array([
+    [0.86738906, 0.27889447],
+    [0.28676471, 0.        ],
+    [0.7120743,  0.27328952],
+    [0.0504386,  0.16061075],
+    [0.39628483, 0.31580982],
+    [0.98013416, 0.85968303],
+    [0.9756192,  0.71627368],
+    [0.93588751, 0.24313877],
+    [0.88854489, 0.36238887],
+    [0.14215686, 0.39408581],
+    [0.70407637, 0.50173947],
+    [0.77128483, 0.55334364],
+    [0.60577915, 0.5148821 ],
+    [0.59365325, 0.39137998],
+    [0.81746646, 0.51662157],
+    [0.78650671, 0.12736761],
+    [0.98052116, 1.        ],
+    [0.96130031, 0.69192114],
+    [0.99613003, 0.91090066],
+    [0.75980392, 0.6863162 ],
+    [0.57701238, 0.64920758],
+    [0.78573271, 0.21260147],
+    [0.66937564, 0.41979126],
+    [0.20936533, 0.5409741 ],
+    [0.55430857, 0.44684963],
+    [0.08578431, 0.19250097],
+    [0.97329721, 0.92945497],
+    [0.97149123, 0.7674913 ],
+    [0.40853973, 0.14418245],
+    [0.94711042, 0.86896019],
+    [0.97200722, 0.53942791],
+    [0.41731166, 0.63683804],
+    [0.82765738, 0.61132586],
+    [0.59313725, 0.22960959],
+    [0.00167699, 0.42636258],
+    [0.93369453, 0.72844994],
+    [1.,         0.88616158],
+    [0.95227038, 0.43177426],
+    [0.44814241, 0.54483958],
+    [0.80766254, 0.41070738],
+    [0.64176987, 0.02512563],
+    [0.24587203, 0.30131426],
+    [0.9378225,  0.94491689],
+    [0.96736326, 0.62408195],
+    [0.,         0.51526865],
+    [0.87680599, 0.57653653],
+    [0.66756966, 0.62775416],
+    [0.38867389, 0.37340549],
+])
+
+# input_data = np.array([
+#     [0.33333333, 0.84693878],
+#     [0.54166667, 0.        ],
+#     [0.19791667, 0.05102041],
+#     [0.02083333, 0.64285714],
+#     [0.59375,    0.56122449],
+#     [0.22916667, 0.90816327],
+#     [0.76041667, 0.84693878],
+#     [0.04166667, 0.95918367],
+#     [0.52083333, 0.98979592],
+#     [0.16666667, 0.86734694],
+#     [0.34375,    0.78571429],
+#     [0.32291667, 0.98979592],
+#     [0.09375,    0.23469388],
+#     [0.22916667, 0.7244898 ],
+#     [0.07291667, 1.        ],
+#     [0.30208333, 0.67346939],
+#     [1.,         0.90816327],
+#     [0.75,       0.60204082],
+#     [0.09375,    0.29591837],
+#     [0.5,        0.84693878],
+#     [0.08333333, 0.79591837],
+#     [0.82291667, 0.84693878],
+#     [0.,         0.76530612],
+#     [0.47916667, 0.37755102],
+#     [0.42708333, 0.87755102]
+# ])
+
+# B×N×D に reshape（B=1）
+input_data = input_data[np.newaxis, :, :]  # shape = (1, 25, 2)
+
 # input_data = np.array([
 #     [34, 83],
 #     [54,  0],
@@ -30,55 +113,33 @@ import sys
 #     [ 6, 94],
 #     [52, 97],
 #     [18, 85],
-#     [35, 77],
-#     [33, 97],
-#     [11, 23],
-#     [24, 71],
-#     [ 9, 98],
-#     [31, 66],
-#     [98, 89],
-#     [74, 59],
-#     [11, 29],
-#     [50, 83],
-#     [10, 78],
-#     [81, 83],
-#     [ 2, 75],
-#     [48, 37],
-#     [43, 86]
 # ])
-input_data = np.array([
-    [34, 83],
-    [54,  0],
-    [21,  5],
-    [ 4, 63],
-    [59, 55],
-    [24, 89],
-    [75, 83],
-    [ 6, 94],
-    [52, 97],
-    [18, 85],
-])
 
 def plot_route(reward_history):
     # 最小トータルリワードのエピソードを取得
     best_episode = max(reward_history, key=lambda x: x["total_reward"])
     best_reward = best_episode["total_reward"]
     best_order = best_episode["visit_orders"]
-
+    visit_order_list = [v.item() for v in best_order]
+    print(f"visit_order_list: {visit_order_list}")
+    print(f'best_reward: {best_reward}')
 
     # 訪問順序の最初と最後に 0 を追加して巡回経路にする
-    best_order = [0] + best_order + [0]
-
+    best_order.append(best_order[0])
+    
+    # バッチ次元を除いて扱う
+    input_coords = input_data[0]  # shape: (25, 2)
+    
     # 訪問順序に基づく座標を取得
-    ordered_coords = [input_data[i] for i in best_order]
+    ordered_coords = [input_coords[i] for i in best_order]
 
     # プロットの作成
     plt.figure(figsize=(6, 6))
-    plt.scatter(input_data[:, 0], input_data[:, 1], color='red', label='Cities')
+    plt.scatter(input_coords[:, 0], input_coords[:, 1], color='red', label='Cities')
     plt.plot(*zip(*ordered_coords), marker='o', linestyle='-', color='blue', label='Best Route')
 
     # 各都市にラベルを付与
-    for i, (x, y) in enumerate(input_data):
+    for i, (x, y) in enumerate(input_coords):
         plt.text(x, y, str(i), fontsize=12, verticalalignment='bottom', horizontalalignment='right')
 
     plt.xlabel('X Coordinate')
@@ -86,7 +147,9 @@ def plot_route(reward_history):
     plt.title(f'Best Route with Total Reward: {-1 * best_reward}')
     plt.legend()
     plt.grid(True)
-    plt.show()
+    plt.savefig(f"Best Route")
+    plt.close()  # 状態をリセット（重要）
+    # plt.show()
 
 def plot_reward_history(reward_history_rl, reward_history_random):
     plt.figure(figsize=(10, 6))
@@ -98,7 +161,9 @@ def plot_reward_history(reward_history_rl, reward_history_random):
     plt.title('Total Reward History')
     plt.legend()
     plt.grid(True)
-    plt.show()
+    plt.savefig(f"Best Route Reward History")
+    plt.close()  # 状態をリセット（重要）
+    # plt.show()
 
 def calc_distance_random_order(input_data):
     # 訪問順序をランダムに生成
@@ -117,7 +182,7 @@ def calc_distance_random_order(input_data):
     return total_distance
 
 
-def main(model_path='save/model.pth', episodes=100, plot=False):
+def main(model_path='save/model.pth', episodes=100, plot=True):
     # 同名の .json ファイルからパラメータ読み込み
     config_path = model_path.replace(".pth", ".json")
     with open(config_path, "r") as f:
@@ -128,7 +193,8 @@ def main(model_path='save/model.pth', episodes=100, plot=False):
         lr=config["lr"],
         gamma=config["gamma"]
     )
-    env = TSPEnv(fixed_coords=input_data)
+    env = TSPEnv(batch_size=inference["batch_size"], n_cities=environment["num_cities"], fixed_coords=input_data)
+    env.generate_coords()
     reward_history = []
     reward_history_random = []
 
@@ -173,18 +239,17 @@ def main(model_path='save/model.pth', episodes=100, plot=False):
     if plot:
         plot_route(reward_history)  # 最短経路のプロット
         plot_reward_history(reward_history_rl, reward_history_random)
-    
 
-    # best_reward = min(reward_history_rl)
-    best_reward = np.mean(reward_history_rl) 
-    print(best_reward)
+    min_reward = min(reward_history_rl)  # 最小値
+    # mean_reward = np.mean(reward_history_rl) 
+    print(float(min_reward.item()))  # 文字列入れない、optunaでエラーになる
 
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument("model_path", nargs='?', default="save/model.pth")
     parser.add_argument("--plot", action="store_true", help="プロットを表示するかどうか")
-    parser.add_argument("--episodes", type=int, default=100)
+    parser.add_argument("--episodes", type=int, default=10000)
     args = parser.parse_args()
 
     main(args.model_path, args.episodes, plot=args.plot)
