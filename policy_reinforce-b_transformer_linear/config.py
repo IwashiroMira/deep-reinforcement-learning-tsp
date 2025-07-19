@@ -7,13 +7,12 @@ model = {
     "n_heads": 8,
     "n_layers": 3,
     "dropout": 0.1,
-    "max_nodes": 48  # 都市の数を固定するならここが重要
 }
 
 # 学習設定
 training = {
-    "batch_size": 512,
-    "episodes": 100,
+    "batch_size": 1024,
+    "episodes": 125000,
     "learning_rate": 0.0005,
     "optimizer": "adam",
     "gamma": 0.99  # 割引率（強化学習特有）
