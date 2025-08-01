@@ -102,7 +102,6 @@ class Encoder(nn.Module):
     def __init__(self, input_dim=2, hidden_dim=128, ff_hidden_dim=512, n_layers=3):
         super().__init__()
         self.device = get_device()
-        # self.conv1 = GCNConv(input_dim, hidden_dim)
         self.linear = nn.Linear(input_dim, hidden_dim)
         self.layers = nn.ModuleList([
             EncoderLayer(hidden_dim, ff_hidden_dim) for _ in range(n_layers)
@@ -110,8 +109,7 @@ class Encoder(nn.Module):
         
     def forward(self, data):
         ''' 順伝播 '''
-        x, edge_index, edge_weight, batch = data.x, data.edge_index, data.edge_weight, data.batch
-        # h = self.conv1(x, edge_index, edge_weight)
+        x = data.x
         # print(f"x.shape:{x.shape}")
         h = self.linear(x)
 

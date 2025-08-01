@@ -94,7 +94,7 @@ def main(lr=1e-6, gamma=0.95, episodes=training["episodes"], save_path="save/mod
         baseline_reward_history.append(baseline_total_reward)
 
         # print(f'Episode: {episode}, Total Reward: {total_reward}')
-        if episode % 100 == 0:
+        if episode % 1000 == 0:
             rewards = np.array(agent_total_reward)
             mean = rewards.mean()
             std = rewards.std()
