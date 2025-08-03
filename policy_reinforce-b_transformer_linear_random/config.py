@@ -35,8 +35,8 @@ checkpoint = {
 # 推論設定
 inference = {
     "model_path": "save/model.pth",
-    "batch_size": 100,
-    "episodes": 100,
+    "batch_size": 2,
+    "episodes": 2,
     "plot": True,
     "fixed": False,  # 固定座標での推論を行うか
 }

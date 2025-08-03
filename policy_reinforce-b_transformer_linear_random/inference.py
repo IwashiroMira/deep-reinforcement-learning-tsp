@@ -1,12 +1,12 @@
 import sys
 import os
-import numpy as np
 # プロジェクトのルートディレクトリを追加
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
-
+import numpy as np
 from env.env import TSPEnv
 from agent.agent import Agent
 from agent.baseline import BaseLine
+from model.exact_model import ExactModel
 import copy
 import argparse
 import sys
@@ -47,17 +47,169 @@ def get_minimum_reward(reward_history):
 
     return min_episode_reward, best_order, coords, best_episode, best_idx
 
+def extract_best_orders(random_history, greedy_history):
+    """
+    ランダムサンプリングとGreedyサンプリングの結果から、最小報酬を持つ訪問順序を抽出する。
+    :param random_history: ランダムサンプリングの結果
+    :param greedy_history: Greedyサンプリングの結果
+    :return: 最小報酬と訪問順序
+    """
+    random_min_reward, random_best_order, coords, best_episode, best_idx = get_minimum_reward(random_history)
+    random_best_order = random_best_order.cpu().tolist()  # MPS -> CPU & list化
+
+    # randomのエピソードとインデックス番号からgreedyのベストエピソードを取得
+    greedy_episode = greedy_history[best_episode]
+    greedy_tensor = torch.stack(greedy_episode["visit_orders"]).T
+    greedy_order = greedy_tensor[best_idx].cpu().tolist()  # Greedyの訪問順序を取得
+    greedy_reward = greedy_episode["total_reward"][best_idx].item()  # MPS -> CPU & float化
+
+    return {
+        "random_min_reward": random_min_reward,
+        "random_best_order": random_best_order,
+        "coords": coords,
+        "best_episode": best_episode,
+        "best_idx": best_idx,
+        "greedy_reward": greedy_reward,
+        "greedy_order": greedy_order
+    }
+
+def execute_exact_model(coords):
+    """
+    ExactModelを使用して、与えられた座標に対する最適な巡回路を計算する。
+    :param coords: 都市の座標 (batch_size, num_cities, coord_dim)
+    :return: 最適な巡回路の訪問順序とトータル距離
+    """
+    # ExactModelのインスタンスを作成
+    exact_model = ExactModel(num_cities=environment["num_cities"], coords=coords)
+
+    # 距離行列を計算
+    exact_model.calculate_distance_matrix()
+
+    # モデルを実行して最適な巡回路を求める
+    exact_model.execute()
+
+    # 最適な巡回路の訪問順序とトータル距離を返す
+    return exact_model.total_distance, exact_model.visit_order
+
+def load_input_data(fixed, num_cities):
+    if not fixed:
+        return None
+    # 固定座標のデータを読み込む
+    data = np.load(f"data/fixed_coords_{num_cities}.npy")
+    # B×N×D に reshape（B=1）
+    return data[np.newaxis, :, :]  # shape = (1, 25, 2)
+
+def create_env(fixed_coords, batch_size, num_cities):
+    """
+    環境を生成するヘルパー関数。
+    :param fixed: 座標が固定されているかどうか
+    :param num_cities: 都市の数
+    :return: TSPEnvインスタンス
+    """
+    return TSPEnv(
+        batch_size=batch_size, 
+        n_cities=num_cities, 
+        fixed_coords=fixed_coords
+    )
+
+def run_inference_episode(env, agent, baseline, n_cities, batch_size):
+    """
+    1エピソードの推論を実行する。
+    :param env: TSPEnvインスタンス
+    :param agent: Agentインスタンス
+    :param baseline: BaseLineインスタンス
+    :param n_cities: 都市の数
+    :param batch_size: バッチサイズ
+    :return: 推論結果（報酬、訪問順序）
+    """
+    # 1. 環境の座標を生成
+    env.generate_coords()  # 都市の座標を生成
+    # 2. Baseline用の環境（同じ座標を固定）
+    baseline_env = create_env(
+        fixed_coords=env.coords.copy(),
+        batch_size=batch_size,
+        num_cities=n_cities
+    )
+    baseline_env.generate_coords()  # 固定された座標を使用して環境を初期化
+
+    # 1. AgentとBaselineの環境をリセット
+    data, visited_cities = env.reset()
+    baseline_data, visited_cities_baseline = baseline_env.reset()        
+
+    # 2. encoder_forwardを実行
+    agent.encoder_forward(data)
+    baseline.encoder_forward(baseline_data)
+
+    # doneフラグの初期化
+    batch = visited_cities.shape[0]
+    agent_done = torch.zeros(batch, dtype=torch.bool)
+    baseline_done = torch.zeros(batch, dtype=torch.bool)
+
+    random_reward, greedy_reward = 0, 0
+    random_visit_orders, greedy_visit_orders = [], []
+    
+    # agentの推論
+    while not agent_done.all():
+        action, _ = agent.get_action(visited_cities)
+        random_visit_orders.append(action)
+        visited_cities, reward, agent_done = env.step(action)
+        random_reward += reward
+        
+    # baselineの推論
+    while not baseline_done.all():
+        action, probs = baseline.get_action(visited_cities_baseline)
+        greedy_visit_orders.append(action)
+        visited_cities_baseline, reward, baseline_done = baseline_env.step(action)
+        greedy_reward += reward
+    
+    return {
+        "random": {
+            "total_reward": -1 * random_reward,
+            "visit_orders": random_visit_orders,
+            "coords": env.coords
+        },
+        "greedy": {
+            "total_reward": -1 * greedy_reward,
+            "visit_orders": greedy_visit_orders
+        }
+    }
+
+def print_results(info, exact_reward, exact_best_order,):
+    """
+    結果をコンソールに出力する。
+    :param best_info: 最良の結果情報
+    """
+    print(f"Best Episode: {info["best_episode"]}, Best Index: {info["best_idx"]}")
+    print(f"Exact Reward: {exact_reward}")
+    print(f"Random Reward: {info["random_min_reward"]}")
+    print(f"Greedy Reward: {info["greedy_reward"]}")
+    print(f"Exact Order: {exact_best_order}")
+    print(f"Random Order: {info["random_best_order"]}")
+    print(f"Greedy Order: {info["greedy_order"]}")
+    # print(f"Coordinates: {info["coords"]}")
+
+def plot_results(info, exact_reward, exact_best_order, random_history, greedy_history):
+    coords = info["coords"]
+    utils.plot_route_by_order(coords, info["random_best_order"], info["random_min_reward"], "Random")
+    utils.plot_route_by_order(coords, info["greedy_order"], info["greedy_reward"], "Greedy")
+    utils.plot_route_by_order(coords, exact_best_order, exact_reward, "Exact")
+
+    random_avg = [r["total_reward"].mean() for r in random_history]
+    greedy_avg = [r["total_reward"].mean() for r in greedy_history]
+    utils.plot_reward_history(random_avg, greedy_avg)
+    
 
 def main(model_path='save/model.pth', episodes=100, plot=True, fixed=True):
-    # inputファイルの読み込み
-    if fixed:
-        loaded_data = np.load(f"data/fixed_coords_{environment['num_cities']}.npy")
-        # B×N×D に reshape（B=1）
-        input_data = loaded_data[np.newaxis, :, :]  # shape = (1, 25, 2)
+    num_cities = environment["num_cities"]
+    batch_size = inference["batch_size"]
+
+    # input_dataの読み込み, なければ None
+    input_data = load_input_data(fixed, num_cities)
 
     # 同名の .json ファイルからパラメータ読み込み
-    if os.path.exists(model_path):
-        config = utils.load_config(model_path)
+    if not os.path.exists(model_path):
+        raise FileNotFoundError(f"{model_path} not found.")
+    config = config = utils.load_config(model_path)
 
     # config を使ってAgentとbaseline構築
     agent = Agent(
@@ -69,119 +221,45 @@ def main(model_path='save/model.pth', episodes=100, plot=True, fixed=True):
         gamma=config["gamma"]
     )
 
-    if fixed:
-        # agent用の環境を初期化
-        env = TSPEnv(
-            batch_size=inference["batch_size"], 
-            n_cities=environment["num_cities"], 
-            fixed_coords=input_data
-        )
-    else:
-        # agent用の環境を初期化
-        env = TSPEnv(
-            batch_size=inference["batch_size"], 
-            n_cities=environment["num_cities"], 
-        )
+    # 環境の生成
+    env = create_env(input_data, batch_size, num_cities)
 
     # 保存済みモデルをロード
     agent.load_model(model_path)
     baseline.model.load_state_dict(copy.deepcopy(agent.model.state_dict()))
 
     # 記録用
-    reward_history_greedy = []
-    reward_history_random = []
+    greedy_history, random_history = [], []
 
-    for episode in range(episodes):
-        # print('episode:', episode)
-        # 1. 環境の座標を生成
-        env.generate_coords()  # 都市の座標を生成
-        # 2. Baseline用の環境（同じ座標を固定）
-        baseline_env = TSPEnv(
-            batch_size=inference["batch_size"], 
-            n_cities=environment["num_cities"], 
-            fixed_coords=env.coords.copy()  # 現在の座標をコピー
-        )
-        baseline_env.generate_coords()  # 固定された座標を使用して環境を初期化        
-
-        # 1. AgentとBaselineの環境をリセット
-        data, visited_cities = env.reset()
-        baseline_data, visited_cities_baseline = baseline_env.reset()        
-
-        # 2. encoder_forwardを実行
-        agent.encoder_forward(data)
-        baseline.encoder_forward(baseline_data)
-
-        # doneフラグの初期化
-        batch_size = visited_cities.shape[0]
-        agent_done = torch.zeros(batch_size, dtype=torch.bool)
-        baseline_done = torch.zeros(batch_size, dtype=torch.bool)
-
-        random_reward = 0
-        random_visit_orders = []
-        greedy_reward = 0
-        greedy_visit_orders = []
-        
-        # agentの推論
-        while not agent_done.all():
-            action, probs = agent.get_action(visited_cities)
-            random_visit_orders.append(action)
-            next_visited_cities, reward, agent_done = env.step(action)
-            
-            random_reward += reward
-            visited_cities = next_visited_cities
-        
-        # baselineの推論
-        while not baseline_done.all():
-            action, probs = baseline.get_action(visited_cities_baseline)
-            greedy_visit_orders.append(action)
-            next_visited_cities, reward, baseline_done = baseline_env.step(action)
-            
-            greedy_reward += reward
-            visited_cities_baseline = next_visited_cities
-        
+    for _ in range(episodes):
+        result = run_inference_episode(env, agent, baseline, num_cities, batch_size)
         # ランダムサンプリングの結果を保存
-        reward_history_random.append({
-            "total_reward": -1 * random_reward,
-            "visit_orders": random_visit_orders,
-            "coords": env.coords
+        random_history.append({
+            "total_reward": result["random"]["total_reward"],
+            "visit_orders": result["random"]["visit_orders"],
+            "coords": result["random"]["coords"]
         })
 
         # greedyサンプリングの結果を保存
-        reward_history_greedy.append({
-            "total_reward": -1 * greedy_reward,
-            "visit_orders": greedy_visit_orders
+        greedy_history.append({
+            "total_reward": result["greedy"]["total_reward"],
+            "visit_orders": result["greedy"]["visit_orders"]
         })
 
-    # print(f"reward_history_random: {reward_history_random}")
-    # print(f"reward_history_greedy: {reward_history_greedy}")
+    # print(f"reward_history_random: {random_history}")
     
-    # randomのベストエピソードを取得
-    random_min_reward, random_best_order, coords, best_episode, best_idx = get_minimum_reward(reward_history_random)
-    random_best_order = random_best_order.cpu().tolist()  # MPS -> CPU & list化
+    # ランダムサンプリングの最小値とその時の貪欲法の値を求める
+    best_info = extract_best_orders(random_history, greedy_history)
+    
+    # 厳密解を求める
+    exact_reward, exact_best_order = execute_exact_model(best_info["coords"])
 
-    # randomのエピソードとインデックス番号からgreedyのベストエピソードを取得
-    greedy_best_episode = reward_history_greedy[best_episode]
-    greedy_visited_tensor_T = torch.stack(greedy_best_episode["visit_orders"]).T
-    greedy_best_order = greedy_visited_tensor_T[best_idx].cpu().tolist()  # Greedyの訪問順序を取得
-
-    # greedy_best_order = greedy_best_episode["visit_orders"][best_idx].cpu().tolist()  # MPS -> CPU & list化
-    greedy_min_reward = greedy_best_episode["total_reward"][best_idx].item()  # MPS -> CPU & float化
-    print(f"Best Episode: {best_episode}, Best Index: {best_idx}")
-    print(f"Random Sampling Min Reward: {random_min_reward}")
-    print(f"Greedy Sampling Min Reward: {greedy_min_reward}")
-    print(f"Random Best Order: {random_best_order}")
-    print(f"Greedy Best Order: {greedy_best_order}")
-    print(f"Coordinates: {coords}")
-
-    # 各エピソードにおける報酬の平均化準備
-    random_reward_results = [r["total_reward"].mean() for r in reward_history_random]
-    greedy_reward_results = [r["total_reward"].mean() for r in reward_history_greedy]
+    # 結果をコンソールに出力
+    print_results(best_info, exact_reward, exact_best_order)
 
     # Best Modelでグラフをプロット
     if plot:
-        utils.plot_route_by_order(coords, random_best_order, random_min_reward, "Random")  # ランダムサンプリングの最短経路のプロット
-        utils.plot_route_by_order(coords, greedy_best_order, greedy_min_reward, "Greedy")  # Greedyサンプリングの最短経路のプロット
-        utils.plot_reward_history(random_reward_results, greedy_reward_results)
+        plot_results(best_info, exact_reward, exact_best_order, random_history, greedy_history)
 
     # optuna対応
     # print(float(min_reward.item()))  # 文字列入れない、optunaでエラーになる
