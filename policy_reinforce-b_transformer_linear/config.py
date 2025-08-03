@@ -21,7 +21,7 @@ training = {
 # 環境設定
 environment = {
     "problem": "tsp",
-    "num_cities": 25,  # 問題に出現する都市の数
+    "num_cities": 48,  # 問題に出現する都市の数
     "normalize": True  # 座標を0〜1にスケーリングするか
 }
 
