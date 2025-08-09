@@ -23,20 +23,28 @@ class TSPEnv:
         self._coords = None
         self.device = get_device()
     
-    def generate_coords(self):
+    def generate_coords(self, mode='train'):
         """
         都市の座標を生成
+        - 固定された座標が指定されている場合はそれを使用
+        - そうでない場合はランダムに生成
         """
-        if self.fixed_coords is not None:
-            coords = np.array(self.fixed_coords, dtype=np.float32)
-            if coords.shape == (1, self.n_cities, self.coord_dim):
-                # (1, 25, 2) → repeat
-                self._coords = np.repeat(coords, self.batch_size, axis=0)
+        if mode == "baseline":
+            if self.fixed_coords is not None:
+                self._coords = np.array(self.fixed_coords, dtype=np.float32)
             else:
-                self._coords = coords
-        else:
+                self._coords = np.random.rand(self.batch_size, self.n_cities, self.coord_dim) * self.data_coord_max
+        
+        elif mode == "random":
+            if self.fixed_coords is None:
+                raise ValueError("random モードでは fixed_coords が必要です。")
+            coords = np.array(self.fixed_coords, dtype=np.float32)
+            self._coords = np.repeat(coords, self.batch_size, axis=0)
+        
+        elif mode == "train":
+            # バッチサイズに応じてランダムな座標を生成
             self._coords = np.random.rand(self.batch_size, self.n_cities, self.coord_dim) * self.data_coord_max
-    
+            
     @property
     def coords(self):
         """
