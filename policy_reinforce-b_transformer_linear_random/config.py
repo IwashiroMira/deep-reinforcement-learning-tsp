@@ -21,7 +21,7 @@ training = {
 # 環境設定
 environment = {
     "problem": "tsp",
-    "num_cities": 25,  # 問題に出現する都市の数
+    "num_cities": 48,  # 問題に出現する都市の数
     "normalize": True  # 座標を0〜1にスケーリングするか
 }
 
@@ -35,8 +35,8 @@ checkpoint = {
 # 推論設定
 inference = {
     "model_path": "save/model.pth",
-    "batch_size": 2,
-    "episodes": 2,
+    "batch_size": 1024,
+    "episodes": 10,
     "plot": True,
-    "fixed": False,  # 固定座標での推論を行うか
+    "fixed": True,  # 固定座標での推論を行うか
 }

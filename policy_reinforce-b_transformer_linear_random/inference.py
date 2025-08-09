@@ -13,6 +13,7 @@ import sys
 from config import environment, inference
 import utils
 import torch
+import time
 
 
 def get_minimum_reward(reward_history):
@@ -203,6 +204,8 @@ def main(model_path='save/model.pth', episodes=100, plot=True, fixed=True):
     num_cities = environment["num_cities"]
     batch_size = inference["batch_size"]
 
+    print(f"推論実行：都市数 {num_cities}, 固定座標 {fixed}")
+
     # input_dataの読み込み, なければ None
     input_data = load_input_data(fixed, num_cities)
 
@@ -231,7 +234,11 @@ def main(model_path='save/model.pth', episodes=100, plot=True, fixed=True):
     # 記録用
     greedy_history, random_history = [], []
 
-    for _ in range(episodes):
+    # ランダムサンプリングの処理時間計測開始
+    start_loop = time.time()
+    
+    for episode in range(episodes):
+        print(f"episode: {episode}")
         result = run_inference_episode(env, agent, baseline, num_cities, batch_size)
         # ランダムサンプリングの結果を保存
         random_history.append({
@@ -251,8 +258,19 @@ def main(model_path='save/model.pth', episodes=100, plot=True, fixed=True):
     # ランダムサンプリングの最小値とその時の貪欲法の値を求める
     best_info = extract_best_orders(random_history, greedy_history)
     
+    # ランダムサンプリングの処理時間計測終了
+    end_loop = time.time()
+    print(f"randomサンプリング: {end_loop - start_loop:.4f} 秒")
+    
+    # 厳密解計算の処理時間計測開始
+    start_exact = time.time()
+
     # 厳密解を求める
     exact_reward, exact_best_order = execute_exact_model(best_info["coords"])
+
+    # 厳密解計算の処理時間計測終了
+    end_exact = time.time()
+    print(f"厳密解計算の処理時間: {end_exact - start_exact:.4f} 秒")
 
     # 結果をコンソールに出力
     print_results(best_info, exact_reward, exact_best_order)
