@@ -13,6 +13,7 @@ import sys
 from config import environment, inference
 import utils
 import torch
+import time
 
 
 def get_minimum_reward(reward_history):
@@ -60,8 +61,8 @@ def extract_best_orders(random_history, greedy_history):
     # randomのエピソードとインデックス番号からgreedyのベストエピソードを取得
     greedy_episode = greedy_history[best_episode]
     greedy_tensor = torch.stack(greedy_episode["visit_orders"]).T
-    greedy_order = greedy_tensor[best_idx].cpu().tolist()  # Greedyの訪問順序を取得
-    greedy_reward = greedy_episode["total_reward"][best_idx].item()  # MPS -> CPU & float化
+    greedy_order = greedy_tensor.cpu().tolist()[0]  # Greedyの訪問順序を取得
+    greedy_reward = greedy_episode["total_reward"].item()  # MPS -> CPU & float化
 
     return {
         "random_min_reward": random_min_reward,
@@ -92,6 +93,13 @@ def execute_exact_model(coords):
     return exact_model.total_distance, exact_model.visit_order
 
 def load_input_data(fixed, num_cities):
+    """
+    入力データを読み込み関数。
+    :param fixed: 座標が固定されているかどうか
+    :param num_cities: 都市の数
+    :return: 座標データ
+    """
+    # 座標が固定されていない場合は None を返す
     if not fixed:
         return None
     # 固定座標のデータを読み込む
@@ -112,7 +120,7 @@ def create_env(fixed_coords, batch_size, num_cities):
         fixed_coords=fixed_coords
     )
 
-def run_inference_episode(env, agent, baseline, n_cities, batch_size):
+def run_inference_episode(baseline_env, agent, baseline, n_cities, batch_size):
     """
     1エピソードの推論を実行する。
     :param env: TSPEnvインスタンス
@@ -122,15 +130,18 @@ def run_inference_episode(env, agent, baseline, n_cities, batch_size):
     :param batch_size: バッチサイズ
     :return: 推論結果（報酬、訪問順序）
     """
+    print("run_inference_episode")
     # 1. 環境の座標を生成
-    env.generate_coords()  # 都市の座標を生成
+    baseline_env.generate_coords("baseline")  # 都市の座標を生成
     # 2. Baseline用の環境（同じ座標を固定）
-    baseline_env = create_env(
-        fixed_coords=env.coords.copy(),
+    env = create_env(
+        fixed_coords=baseline_env.coords.copy(),
         batch_size=batch_size,
         num_cities=n_cities
     )
-    baseline_env.generate_coords()  # 固定された座標を使用して環境を初期化
+    env.generate_coords("random")  # 固定された座標を使用して環境を初期化
+
+    print(f"env.coords: {env.coords.shape}, baseline_env.coords: {baseline_env.coords.shape}")
 
     # 1. AgentとBaselineの環境をリセット
     data, visited_cities = env.reset()
@@ -170,7 +181,8 @@ def run_inference_episode(env, agent, baseline, n_cities, batch_size):
         },
         "greedy": {
             "total_reward": -1 * greedy_reward,
-            "visit_orders": greedy_visit_orders
+            "visit_orders": greedy_visit_orders,
+            "coords": baseline_env.coords
         }
     }
 
@@ -201,7 +213,10 @@ def plot_results(info, exact_reward, exact_best_order, random_history, greedy_hi
 
 def main(model_path='save/model.pth', episodes=100, plot=True, fixed=True):
     num_cities = environment["num_cities"]
-    batch_size = inference["batch_size"]
+    random_batch_size = inference["random_batch_size"]
+    baseline_batch_size = inference["baseline_batch_size"]
+
+    print(f"推論実行：都市数 {num_cities}, 固定座標 {fixed}")
 
     # input_dataの読み込み, なければ None
     input_data = load_input_data(fixed, num_cities)
@@ -222,7 +237,7 @@ def main(model_path='save/model.pth', episodes=100, plot=True, fixed=True):
     )
 
     # 環境の生成
-    env = create_env(input_data, batch_size, num_cities)
+    baseline_env = create_env(input_data, baseline_batch_size, num_cities)
 
     # 保存済みモデルをロード
     agent.load_model(model_path)
@@ -231,8 +246,12 @@ def main(model_path='save/model.pth', episodes=100, plot=True, fixed=True):
     # 記録用
     greedy_history, random_history = [], []
 
-    for _ in range(episodes):
-        result = run_inference_episode(env, agent, baseline, num_cities, batch_size)
+    # ランダムサンプリングの処理時間計測開始
+    start_loop = time.time()
+    
+    for episode in range(episodes):
+        print(f"episode: {episode}")
+        result = run_inference_episode(baseline_env, agent, baseline, num_cities, random_batch_size)
         # ランダムサンプリングの結果を保存
         random_history.append({
             "total_reward": result["random"]["total_reward"],
@@ -243,16 +262,29 @@ def main(model_path='save/model.pth', episodes=100, plot=True, fixed=True):
         # greedyサンプリングの結果を保存
         greedy_history.append({
             "total_reward": result["greedy"]["total_reward"],
-            "visit_orders": result["greedy"]["visit_orders"]
+            "visit_orders": result["greedy"]["visit_orders"],
+            "coords": result["greedy"]["coords"]
         })
 
     # print(f"reward_history_random: {random_history}")
+    # print(f"reward_history_greedy: {greedy_history}")
     
     # ランダムサンプリングの最小値とその時の貪欲法の値を求める
     best_info = extract_best_orders(random_history, greedy_history)
     
+    # ランダムサンプリングの処理時間計測終了
+    end_loop = time.time()
+    print(f"randomサンプリング: {end_loop - start_loop:.4f} 秒")
+    
+    # 厳密解計算の処理時間計測開始
+    start_exact = time.time()
+
     # 厳密解を求める
     exact_reward, exact_best_order = execute_exact_model(best_info["coords"])
+
+    # 厳密解計算の処理時間計測終了
+    end_exact = time.time()
+    print(f"厳密解計算の処理時間: {end_exact - start_exact:.4f} 秒")
 
     # 結果をコンソールに出力
     print_results(best_info, exact_reward, exact_best_order)
