@@ -14,7 +14,15 @@ from config import environment, inference
 import utils
 import torch
 import time
+import logging
 
+# ログ設定
+logging.basicConfig(
+    filename='inference.log',  # 出力先ファイル
+    filemode='a',             # 'w' だと毎回上書き、'a' なら追記
+    level=logging.INFO,       # ログレベル
+    format='%(asctime)s - %(levelname)s - %(message)s'
+)
 
 def get_minimum_reward(reward_history):
     """
@@ -130,7 +138,7 @@ def run_inference_episode(baseline_env, agent, baseline, n_cities, batch_size):
     :param batch_size: バッチサイズ
     :return: 推論結果（報酬、訪問順序）
     """
-    print("run_inference_episode")
+    # print("run_inference_episode")
     # 1. 環境の座標を生成
     baseline_env.generate_coords("baseline")  # 都市の座標を生成
     # 2. Baseline用の環境（同じ座標を固定）
@@ -141,7 +149,7 @@ def run_inference_episode(baseline_env, agent, baseline, n_cities, batch_size):
     )
     env.generate_coords("random")  # 固定された座標を使用して環境を初期化
 
-    print(f"env.coords: {env.coords.shape}, baseline_env.coords: {baseline_env.coords.shape}")
+    logging.info(f"env.coords: {env.coords.shape}, baseline_env.coords: {baseline_env.coords.shape}")
 
     # 1. AgentとBaselineの環境をリセット
     data, visited_cities = env.reset()
@@ -191,13 +199,13 @@ def print_results(info, exact_reward, exact_best_order,):
     結果をコンソールに出力する。
     :param best_info: 最良の結果情報
     """
-    print(f"Best Episode: {info["best_episode"]}, Best Index: {info["best_idx"]}")
-    print(f"Exact Reward: {exact_reward}")
-    print(f"Random Reward: {info["random_min_reward"]}")
-    print(f"Greedy Reward: {info["greedy_reward"]}")
-    print(f"Exact Order: {exact_best_order}")
-    print(f"Random Order: {info["random_best_order"]}")
-    print(f"Greedy Order: {info["greedy_order"]}")
+    logging.info(f"Best Episode: {info["best_episode"]}, Best Index: {info["best_idx"]}")
+    logging.info(f"Exact Reward: {exact_reward}")
+    logging.info(f"Random Reward: {info["random_min_reward"]}")
+    logging.info(f"Greedy Reward: {info["greedy_reward"]}")
+    logging.info(f"Exact Order: {exact_best_order}")
+    logging.info(f"Random Order: {info["random_best_order"]}")
+    logging.info(f"Greedy Order: {info["greedy_order"]}")
     # print(f"Coordinates: {info["coords"]}")
 
 def plot_results(info, exact_reward, exact_best_order, random_history, greedy_history):
@@ -216,7 +224,7 @@ def main(model_path='save/model.pth', episodes=100, plot=True, fixed=True):
     random_batch_size = inference["random_batch_size"]
     baseline_batch_size = inference["baseline_batch_size"]
 
-    print(f"推論実行：都市数 {num_cities}, 固定座標 {fixed}")
+    logging.info(f"推論実行：都市数 {num_cities}, 固定座標 {fixed}")
 
     # input_dataの読み込み, なければ None
     input_data = load_input_data(fixed, num_cities)
@@ -250,7 +258,7 @@ def main(model_path='save/model.pth', episodes=100, plot=True, fixed=True):
     start_loop = time.time()
     
     for episode in range(episodes):
-        print(f"episode: {episode}")
+        logging.info(f"episode: {episode}")
         result = run_inference_episode(baseline_env, agent, baseline, num_cities, random_batch_size)
         # ランダムサンプリングの結果を保存
         random_history.append({
@@ -274,7 +282,7 @@ def main(model_path='save/model.pth', episodes=100, plot=True, fixed=True):
     
     # ランダムサンプリングの処理時間計測終了
     end_loop = time.time()
-    print(f"randomサンプリング: {end_loop - start_loop:.4f} 秒")
+    logging.info(f"randomサンプリング: {end_loop - start_loop:.4f} 秒")
     
     # 厳密解計算の処理時間計測開始
     start_exact = time.time()
@@ -284,7 +292,7 @@ def main(model_path='save/model.pth', episodes=100, plot=True, fixed=True):
 
     # 厳密解計算の処理時間計測終了
     end_exact = time.time()
-    print(f"厳密解計算の処理時間: {end_exact - start_exact:.4f} 秒")
+    logging.info(f"厳密解計算の処理時間: {end_exact - start_exact:.4f} 秒")
 
     # 結果をコンソールに出力
     print_results(best_info, exact_reward, exact_best_order)
