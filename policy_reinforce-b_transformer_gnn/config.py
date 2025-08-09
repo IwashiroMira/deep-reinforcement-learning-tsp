@@ -11,8 +11,8 @@ model = {
 
 # 学習設定
 training = {
-    "batch_size": 1024,
-    "episodes": 125000,
+    "batch_size": 1000,
+    "episodes": 10,
     "learning_rate": 0.0005,
     "optimizer": "adam",
     "gamma": 0.99  # 割引率（強化学習特有）
@@ -21,7 +21,7 @@ training = {
 # 環境設定
 environment = {
     "problem": "tsp",
-    "num_cities": 48,  # 問題に出現する都市の数
+    "num_cities": 25,  # 問題に出現する都市の数
     "normalize": True  # 座標を0〜1にスケーリングするか
 }
 

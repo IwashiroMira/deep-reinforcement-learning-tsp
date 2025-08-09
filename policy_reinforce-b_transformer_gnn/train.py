@@ -35,12 +35,13 @@ def main(lr=1e-6, gamma=0.95, episodes=training["episodes"], save_path="save/mod
     for episode in range(episodes):
         # print('episode:', episode)
         # 1. 環境の座標を生成
-        env.generate_coords()  # 都市の座標を生成
+        env.generate_coords("train")  # 都市の座標を生成
         # 2. Baseline用の環境（同じ座標を固定）
         fixed_coords = env.coords.copy()  # 現在の座標をコピー
         baseline_env = TSPEnv(batch_size=training["batch_size"], n_cities=environment["num_cities"], fixed_coords=fixed_coords)
-        baseline_env.generate_coords()  # 固定された座標を使用して環境を初期化
-
+        baseline_env.generate_coords("baseline")  # 固定された座標を使用して環境を初期化
+        # print(f"env.coords: {env.coords.shape}, baseline_env.coords: {baseline_env.coords.shape}")
+        
         # 3. AgentとBaselineの環境をリセット
         data, visited_cities = env.reset()
         baseline_data, visited_cities_baseline = baseline_env.reset()        
