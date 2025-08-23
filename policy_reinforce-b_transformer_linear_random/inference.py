@@ -24,38 +24,6 @@ logging.basicConfig(
     format='%(asctime)s - %(levelname)s - %(message)s'
 )
 
-def get_minimum_reward(reward_history):
-    """
-    各エピソードにおける total_reward のうち、最小の報酬を持つエントリを探し、
-    その報酬、訪問順序、座標を返す。
-    """
-    min_episode_reward = float("inf")
-    best_order = None
-    coords = None
-    best_episode = None
-    best_idx = None
-
-    for episode, data in enumerate(reward_history):
-        # 最小報酬のインデックスを取得
-        min_idx = data["total_reward"].argmin()
-        current_reward = data["total_reward"][min_idx]
-
-        if current_reward < min_episode_reward:
-            min_episode_reward = current_reward
-
-            # visit_orders: (visit_step, batch_size) → 転置して (batch_size, visit_step)
-            visit_tensor_T = torch.stack(data["visit_orders"]).T
-            best_order = visit_tensor_T[min_idx]
-
-            # 対応する座標 (25, 2)
-            coords = data["coords"][min_idx]
-
-            # インデックス記録
-            best_episode = episode
-            best_idx = min_idx
-
-    return min_episode_reward, best_order, coords, best_episode, best_idx
-
 def extract_best_orders(random_history, greedy_history):
     """
     ランダムサンプリングとGreedyサンプリングの結果から、最小報酬を持つ訪問順序を抽出する。
@@ -149,7 +117,7 @@ def run_inference_episode(baseline_env, agent, baseline, n_cities, batch_size):
     )
     env.generate_coords("random")  # 固定された座標を使用して環境を初期化
 
-    logging.info(f"env.coords: {env.coords.shape}, baseline_env.coords: {baseline_env.coords.shape}")
+    # logging.info(f"env.coords: {env.coords.shape}, baseline_env.coords: {baseline_env.coords.shape}")
 
     # 1. AgentとBaselineの環境をリセット
     data, visited_cities = env.reset()
@@ -194,6 +162,26 @@ def run_inference_episode(baseline_env, agent, baseline, n_cities, batch_size):
         }
     }
 
+def get_minimum_reward(random_result):
+    """
+    各エピソードにおける total_reward のうち、最小の報酬を持つエントリを探し、
+    その報酬、訪問順序、座標を返す。
+    """
+    # 最小報酬のインデックスを取得
+    min_idx = random_result["total_reward"].argmin()
+    min_reward = random_result["total_reward"][min_idx]
+
+    # visit_orders: (visit_step, batch_size) → 転置して (batch_size, visit_step)
+    visit_tensor_T = torch.stack(random_result["visit_orders"]).T
+    best_order = visit_tensor_T[min_idx]
+
+    return min_reward, best_order
+
+def calc_reward_mean(history):
+    rewards = np.array([float(h["total_reward"]) for h in history], dtype=float)
+    return float(rewards.mean())
+
+
 def print_results(info, exact_reward, exact_best_order,):
     """
     結果をコンソールに出力する。
@@ -217,6 +205,12 @@ def plot_results(info, exact_reward, exact_best_order, random_history, greedy_hi
     random_avg = [r["total_reward"].mean() for r in random_history]
     greedy_avg = [r["total_reward"].mean() for r in greedy_history]
     utils.plot_reward_history(random_avg, greedy_avg)
+
+def plot_reward_history(random, greedy, exact, title):
+    random_avg = [r["total_reward"] for r in random]
+    greedy_avg = [r["total_reward"] for r in greedy]
+    exact_avg = [r["total_reward"] for r in exact]
+    utils.plot_reward_history_triple(random_avg, greedy_avg, exact_avg, title)
     
 
 def main(model_path='save/model.pth', episodes=100, plot=True, fixed=True):
@@ -252,19 +246,25 @@ def main(model_path='save/model.pth', episodes=100, plot=True, fixed=True):
     baseline.model.load_state_dict(copy.deepcopy(agent.model.state_dict()))
 
     # 記録用
-    greedy_history, random_history = [], []
+    greedy_history, random_history, exact_history = [], [], []
 
     # ランダムサンプリングの処理時間計測開始
-    start_loop = time.time()
+    # start_loop = time.time()
     
     for episode in range(episodes):
-        logging.info(f"episode: {episode}")
+        if episode % 100 == 0:
+            logging.info(f"episode: {episode}")
+        
+        # 推論実行
         result = run_inference_episode(baseline_env, agent, baseline, num_cities, random_batch_size)
-        # ランダムサンプリングの結果を保存
+        
+        # ランダムサンプリングの最小値を求める
+        random_min_reward, random_best_order = get_minimum_reward(result["random"])
+    
+        # ランダムサンプリングの最小値を保存
         random_history.append({
-            "total_reward": result["random"]["total_reward"],
-            "visit_orders": result["random"]["visit_orders"],
-            "coords": result["random"]["coords"]
+            "total_reward": random_min_reward,
+            "visit_orders": random_best_order,
         })
 
         # greedyサンプリングの結果を保存
@@ -274,35 +274,36 @@ def main(model_path='save/model.pth', episodes=100, plot=True, fixed=True):
             "coords": result["greedy"]["coords"]
         })
 
+        # 厳密解を求める
+        exact_reward, exact_best_order = execute_exact_model(result["greedy"]["coords"].squeeze())
+
+        # 厳密解の結果を保存
+        exact_history.append({
+            "total_reward": exact_reward,
+            "visit_orders": exact_best_order,
+        })
+
     # print(f"reward_history_random: {random_history}")
     # print(f"reward_history_greedy: {greedy_history}")
+    # print(f"reward_history_exact: {exact_history}")
     
-    # ランダムサンプリングの最小値とその時の貪欲法の値を求める
-    best_info = extract_best_orders(random_history, greedy_history)
+    random_mean = calc_reward_mean(random_history)
+    greedy_mean = calc_reward_mean(greedy_history)
+    exact_mean = calc_reward_mean(exact_history)
+    logging.info(f"random平均値: {random_mean}")
+    logging.info(f"greedy平均値: {greedy_mean}")
+    logging.info(f"exact平均値: {exact_mean}")
+
+    # exactに対する増加率を計算
+    random_rate = (random_mean - exact_mean) / exact_mean
+    greedy_rate = (greedy_mean - exact_mean) / exact_mean
     
-    # ランダムサンプリングの処理時間計測終了
-    end_loop = time.time()
-    logging.info(f"randomサンプリング: {end_loop - start_loop:.4f} 秒")
+    logging.info(f"ランダムの増加率：{random_rate*100:.2f}%")
+    logging.info(f"貪欲法の増加率：{greedy_rate*100:.2f}%")
     
-    # 厳密解計算の処理時間計測開始
-    start_exact = time.time()
-
-    # 厳密解を求める
-    exact_reward, exact_best_order = execute_exact_model(best_info["coords"])
-
-    # 厳密解計算の処理時間計測終了
-    end_exact = time.time()
-    logging.info(f"厳密解計算の処理時間: {end_exact - start_exact:.4f} 秒")
-
-    # 結果をコンソールに出力
-    print_results(best_info, exact_reward, exact_best_order)
-
-    # Best Modelでグラフをプロット
+    # # Best Modelでグラフをプロット
     if plot:
-        plot_results(best_info, exact_reward, exact_best_order, random_history, greedy_history)
-
-    # optuna対応
-    # print(float(min_reward.item()))  # 文字列入れない、optunaでエラーになる
+        plot_reward_history(random_history, greedy_history, exact_history, "Reward History 25")
 
 
 if __name__ == '__main__':
