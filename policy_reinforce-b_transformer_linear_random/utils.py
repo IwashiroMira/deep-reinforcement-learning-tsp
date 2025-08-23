@@ -118,6 +118,21 @@ def plot_reward_history(random_reward_history, greedy_reward_history):
     plt.close()  # 状態をリセット（重要）
 
 @staticmethod
+def plot_reward_history_triple(random, greedy, exact, title):
+    plt.figure(figsize=(10, 6))
+    plt.plot(random, label='random', linestyle='-', marker='o')
+    plt.plot(greedy, label='greedy', linestyle='--', marker='x')
+    plt.plot(exact, label='exact', linestyle='-', marker='D')
+    
+    plt.xlabel('Episodes')
+    plt.ylabel('Total Reward')
+    plt.title(title)
+    plt.legend()
+    plt.grid(True)
+    plt.savefig(f"./route/{title}")
+    plt.close()  # 状態をリセット（重要）
+
+@staticmethod
 def calc_distance_random_order(input_data):
     # 訪問順序をランダムに生成
     n_cities = len(input_data)
