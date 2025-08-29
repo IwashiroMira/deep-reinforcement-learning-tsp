@@ -13,10 +13,10 @@ model = {
 training = {
     "batch_size": 1024,
     "episodes": 125000,
-    "lr": 1.0e-4,
+    "lr": 1.0e-3,
     "optimizer": "adam",
     "gamma": 0.95,  # 割引率（強化学習特有）
-    "model_path": "save/model_25_01.pth"
+    "model_path": "save/model_25_02.pth"
 }
 
 # 環境設定
@@ -35,7 +35,7 @@ checkpoint = {
 
 # 推論設定
 inference = {
-    "model_path": "save/model.pth",
+    "model_path": "save/model_25_01.pth",
     "random_batch_size": 1280,  # 本番は1280に固定
     "baseline_batch_size": 1,  # baselineのバッチサイズは常に1
     "episodes": 10000,  # fixed=Trueの時は1エピソードのみ
