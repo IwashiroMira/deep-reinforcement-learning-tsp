@@ -40,6 +40,34 @@ def load_config(model_path):
     return config
 
 @staticmethod
+def plot_route_by_order(input_coords, orders, reward, type):
+    best_reward = reward
+    best_order = orders
+
+    # 訪問順序の最初と最後に 0 を追加して巡回経路にする
+    best_order.append(best_order[0])
+    
+    # 訪問順序に基づく座標を取得
+    ordered_coords = [input_coords[i] for i in best_order]
+    
+    # プロットの作成
+    plt.figure(figsize=(6, 6))
+    plt.scatter(input_coords[:, 0], input_coords[:, 1], color='red', label='Cities')
+    plt.plot(*zip(*ordered_coords), marker='o', linestyle='-', color='blue', label='Best Route')
+
+    # 各都市にラベルを付与
+    for i, (x, y) in enumerate(input_coords):
+        plt.text(x, y, str(i), fontsize=12, verticalalignment='bottom', horizontalalignment='right')
+
+    plt.xlabel('X Coordinate')
+    plt.ylabel('Y Coordinate')
+    plt.title(f'Best Route with Total Reward {type}: {best_reward}')
+    plt.legend()
+    plt.grid(True)
+    plt.savefig(f"./route/Best Route {type}")
+    plt.close()  # 状態をリセット（重要）
+
+@staticmethod
 def plot_route(input_data, reward_history, type):
     # 最小トータルリワードのエピソードを取得
     best_episode = max(reward_history, key=lambda x: x["total_reward"])
@@ -87,6 +115,21 @@ def plot_reward_history(random_reward_history, greedy_reward_history):
     plt.legend()
     plt.grid(True)
     plt.savefig(f"./route/Best Route Reward History")
+    plt.close()  # 状態をリセット（重要）
+
+@staticmethod
+def plot_reward_history_triple(random, greedy, exact, title):
+    plt.figure(figsize=(10, 6))
+    plt.plot(random, label='random', linestyle='-', marker='o')
+    plt.plot(greedy, label='greedy', linestyle='--', marker='x')
+    plt.plot(exact, label='exact', linestyle='-', marker='D')
+    
+    plt.xlabel('Episodes')
+    plt.ylabel('Total Reward')
+    plt.title(title)
+    plt.legend()
+    plt.grid(True)
+    plt.savefig(f"./route/{title}")
     plt.close()  # 状態をリセット（重要）
 
 @staticmethod

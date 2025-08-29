@@ -13,15 +13,16 @@ model = {
 training = {
     "batch_size": 1024,
     "episodes": 125000,
-    "learning_rate": 0.0005,
+    "lr": 1.0e-4,
     "optimizer": "adam",
-    "gamma": 0.99  # 割引率（強化学習特有）
+    "gamma": 0.95,  # 割引率（強化学習特有）
+    "model_path": "save/model_25_01.pth"
 }
 
 # 環境設定
 environment = {
     "problem": "tsp",
-    "num_cities": 48,  # 問題に出現する都市の数
+    "num_cities": 25,  # 問題に出現する都市の数
     "normalize": True  # 座標を0〜1にスケーリングするか
 }
 
@@ -34,8 +35,10 @@ checkpoint = {
 
 # 推論設定
 inference = {
-    "batch_size": 1,
-    "episodes": 10,
+    "model_path": "save/model.pth",
+    "random_batch_size": 1280,  # 本番は1280に固定
+    "baseline_batch_size": 1,  # baselineのバッチサイズは常に1
+    "episodes": 10000,  # fixed=Trueの時は1エピソードのみ
     "plot": True,
-    "seed": 42
+    "fixed": False,  # 固定座標での推論を行うか
 }

@@ -24,7 +24,11 @@ logging.basicConfig(
     format='%(asctime)s - %(levelname)s - %(message)s'
 )
 
-def main(lr=1e-6, gamma=0.95, episodes=training["episodes"], save_path="save/model.pth"):
+def main(lr=training["lr"], 
+         gamma=training["gamma"], 
+         episodes=training["episodes"], 
+         save_path=training["model_path"]
+         ):
     env = TSPEnv(batch_size=training["batch_size"], n_cities=environment["num_cities"])
     agent = Agent(lr=lr, gamma=gamma)
     baseline = BaseLine(lr=lr, gamma=gamma)

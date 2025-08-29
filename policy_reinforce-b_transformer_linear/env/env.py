@@ -20,28 +20,46 @@ class TSPEnv:
         self.coord_dim = coord_dim  # 座標の次元（例: x, y）
         self.data_coord_max = 1  # 座標の最大値
         self.fixed_coords = fixed_coords  # 固定された都市の座標
+        self._coords = None
         self.device = get_device()
     
-    def generate_coords(self):
+    def generate_coords(self, mode='train'):
         """
         都市の座標を生成
+        - 固定された座標が指定されている場合はそれを使用
+        - そうでない場合はランダムに生成
         """
-        if self.fixed_coords is not None:
-            self.coords = torch.tensor(self.fixed_coords, dtype=torch.float32)
-        else:
-            self.coords = np.random.rand(self.batch_size, self.n_cities, self.coord_dim) * self.data_coord_max
-            # self.coords = coords.squeeze()
-            # print("生成された都市の座標:")
-            # print(self.coords)
+        if mode == "baseline":
+            if self.fixed_coords is not None:
+                self._coords = np.array(self.fixed_coords, dtype=np.float32)
+            else:
+                self._coords = np.random.rand(self.batch_size, self.n_cities, self.coord_dim) * self.data_coord_max
+        
+        elif mode == "random":
+            if self.fixed_coords is None:
+                raise ValueError("random モードでは fixed_coords が必要です。")
+            coords = np.array(self.fixed_coords, dtype=np.float32)
+            self._coords = np.repeat(coords, self.batch_size, axis=0)
+        
+        elif mode == "train":
+            # バッチサイズに応じてランダムな座標を生成
+            self._coords = np.random.rand(self.batch_size, self.n_cities, self.coord_dim) * self.data_coord_max
+            
+    @property
+    def coords(self):
+        """
+        都市の座標を取得するプロパティ
+        """
+        if self._coords is None:
+            raise ValueError("座標がまだ生成されていません。generate_coords() を先に呼び出してください。")
+        return self._coords
         
     def reset(self):
         """
         環境のリセット
         - 訪問履歴、現在地、未訪問都市の初期化
         """
-        # 座標を生成
-        # self._generate_coords()
-        # print(f'coords: {self.coords}')
+        # 都市の訪問順
         self.visited_cities = np.zeros((self.batch_size, self.n_cities), dtype=int)  # 訪問済み都市
         # print(f'visited_cities: {self.visited_cities}')
 
@@ -57,11 +75,9 @@ class TSPEnv:
         return data, self.visited_cities
 
     def _get_data(self):
-        if isinstance(self.coords, np.ndarray):
-            self.coords = torch.tensor(self.coords, dtype=torch.float32)
-        # print(f'coords: {self.coords}')
-        # print(f'coords.shape: {self.coords.shape}')
-        B, N, D = self.coords.shape  # B: バッチサイズ, N: 都市の数, D: 座標の次元
+        if isinstance(self._coords, np.ndarray):
+            self._coords = torch.tensor(self._coords, dtype=torch.float32)
+        B, N, D = self._coords.shape  # B: バッチサイズ, N: 都市の数, D: 座標の次元
         data_list = []
 
         # すべての都市ペアを生成（i ≠ j）
@@ -76,7 +92,7 @@ class TSPEnv:
 
         for b in range(B):
             # 各バッチの都市座標を取得
-            coords_b = self.coords[b]
+            coords_b = self._coords[b]
             # print(f'coords_b: {coords_b}')
             # エッジの始点と終点の座標を取り出す
             src = edge_index[0]
@@ -152,7 +168,7 @@ class TSPEnv:
                 # print('current_city is -1')
                 distance[b] = 0.0
             else:
-                distance[b] = -1 * np.linalg.norm(self.coords[b, current_city] - self.coords[b, next_city])
+                distance[b] = -1 * np.linalg.norm(self._coords[b, current_city] - self._coords[b, next_city])
             
             # print(f'batch {b}: current_city={current_city}, next_city={next_city}, distance={distance[b]}')
         
